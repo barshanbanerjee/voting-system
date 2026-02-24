@@ -1,0 +1,149 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(ADMIN)
+  adminCode String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Campaign {
+  id           String         @id @default(uuid())
+  name         String
+  logo         String?
+  description  String?
+  ownerId      String?
+  status       CampaignStatus @default(DRAFT)
+  isPublic     Boolean        @default(false)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  candidates   Candidate[]
+  elections    Election[]
+  votes        Vote[]
+  voteSessions VoteSession[]
+  voters       Voter[]
+}
+
+model Election {
+  id         String      @id @default(uuid())
+  campaignId String
+  name       String
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  candidates Candidate[] @relation("ElectionCandidates")
+  campaign   Campaign    @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  votes      Vote[]
+}
+
+model Candidate {
+  id                String     @id @default(uuid())
+  campaignId        String
+  name              String
+  photo             String?
+  bio               String?
+  symbol            String?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  campaign          Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  assignedElections Election[] @relation("ElectionCandidates")
+  votes             Vote[]
+}
+
+model Voter {
+  id               String        @id @default(uuid())
+  campaignId       String
+  name             String
+  voterId          String
+  phone            String?
+  email            String?
+  address          String?
+  photo            String?
+  verificationCode String?
+  hasVoted         Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  voteSessions     VoteSession[]
+  campaign         Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, voterId])
+}
+
+model VoteSession {
+  id          String        @id @default(uuid())
+  voterId     String
+  campaignId  String
+  status      SessionStatus @default(PENDING)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  campaign    Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  voter       Voter         @relation(fields: [voterId], references: [id], onDelete: Cascade)
+}
+
+model Vote {
+  id           String    @id @default(uuid())
+  campaignId   String
+  electionId   String
+  candidateId  String
+  voterHash    String
+  timestamp    DateTime  @default(now())
+  previousHash String?
+  currentHash  String
+  campaign     Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  candidate    Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  election     Election  @relation(fields: [electionId], references: [id], onDelete: Cascade)
+}
+
+model Terminal {
+  id        String   @id @default(uuid())
+  ip        String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TamperLog {
+  id          String   @id @default(uuid())
+  terminalId  String
+  campaignId  String?
+  timestamp   DateTime @default(now())
+  resolved    Boolean  @default(false)
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  performedBy String
+  metadata    String?
+  timestamp   DateTime @default(now())
+}
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+}
+
+enum SessionStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
